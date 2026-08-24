@@ -1,0 +1,75 @@
+@font-face {
+  font-family: "iconfont"; /* Project id 5152566 */
+  src: url('iconfont.woff2?t=1775441365931') format('woff2'),
+       url('iconfont.woff?t=1775441365931') format('woff'),
+       url('iconfont.ttf?t=1775441365931') format('truetype');
+}
+
+.iconfont {
+  font-family: "iconfont" !important;
+  font-size: 16px;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.icon-a42:before {
+  content: "\e7ca";
+}
+
+.icon-a41:before {
+  content: "\e8a4";
+}
+
+.icon-toilet-paper1:before {
+  content: "\e7ec";
+}
+
+.icon-biaoqianzhi:before {
+  content: "\e604";
+}
+
+.icon-rotate45:before {
+  content: "\e61f";
+}
+
+.icon-rotate45r:before {
+  content: "\e61e";
+}
+
+.icon-flip-vertically:before {
+  content: "\e6da";
+}
+
+.icon-flip-horizontally:before {
+  content: "\e743";
+}
+
+.icon-bianliang:before {
+  content: "\e8a3";
+}
+
+.icon-shangyiyiceng:before {
+  content: "\e62e";
+}
+
+.icon-xiayiyiceng:before {
+  content: "\e62f";
+}
+
+.icon-align-horizontal-space-around:before {
+  content: "\e772";
+}
+
+.icon-align-vertical-space-around:before {
+  content: "\e773";
+}
+
+.icon-group:before {
+  content: "\e7b3";
+}
+
+.icon-ungroup:before {
+  content: "\e82a";
+}
+
