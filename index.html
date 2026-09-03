@@ -1182,6 +1182,13 @@
               <div class="text-xs font-bold text-gray-500 flex items-center gap-3">
                 <label
                   class="flex items-center gap-1 cursor-pointer font-normal text-gray-600 transition-colors hover:text-blue-500">
+                  <input type="checkbox" id="first-row-header-checkbox" checked
+                    onchange="editor.excelData.onHeaderModeChange(this.checked)"
+                    class="w-3.5 h-3.5 cursor-pointer accent-blue-600" />
+                  首行作为标题
+                </label>
+                <label
+                  class="flex items-center gap-1 cursor-pointer font-normal text-gray-600 transition-colors hover:text-blue-500">
                   <input type="checkbox" id="auto-prefix-checkbox" checked
                     class="w-3.5 h-3.5 cursor-pointer accent-blue-600" />
                   自动加项名
@@ -2326,6 +2333,7 @@
           currentSheet: "",
           sheetCache: {},
           allHeaders: {},
+          firstRowAsHeader: true,
         },
         paper: {
           matchLabel: true,
@@ -2997,6 +3005,7 @@
               currentSheet: "",
               sheetCache: {},
               allHeaders: {},
+              firstRowAsHeader: true,
             },
             history: { undo: [], redo: [] },
           };
@@ -3087,6 +3096,7 @@
           const tip = document.getElementById("datasource-tip");
           const actions = document.getElementById("data-actions");
           const rowCount = document.getElementById("data-row-count");
+          const firstRowHeaderCheckbox = document.getElementById("first-row-header-checkbox");
 
           const toggle = (el, show, showClass = "flex") => {
             if (!el) return;
@@ -3100,6 +3110,10 @@
           toggle(dropZone, !hasData, null);
           toggle(tip, !hasData, null);
           toggle(actions, !hasData, null);
+
+          if (firstRowHeaderCheckbox) {
+            firstRowHeaderCheckbox.checked = editor.state.excelData?.firstRowAsHeader !== false;
+          }
 
           if (hasData) {
             editor.excelData.renderSheetTabs();
@@ -7170,6 +7184,84 @@
       excelData: {
         _dropInited: false,
 
+        isFirstRowHeader: function () {
+          const ed = editor.state.excelData;
+          return ed?.firstRowAsHeader !== false;
+        },
+
+        parseSheetData: function (ws) {
+          const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+          if (!json.length) return { headers: [], rows: [] };
+
+          if (this.isFirstRowHeader()) {
+            const headers = (json[0] || []).map((val, index) => {
+              const text = String(val ?? "").trim();
+              return text || `列${index + 1}`;
+            });
+            const rows = json.slice(1).map((row) => {
+              const obj = {};
+              headers.forEach((h, i) => {
+                obj[h] = row[i] !== undefined ? String(row[i]) : "";
+              });
+              return obj;
+            });
+            return { headers, rows };
+          }
+
+          const maxCols = json.reduce((max, row) => Math.max(max, row.length), 0);
+          const headers = Array.from({ length: maxCols }, (_, index) => `列${index + 1}`);
+          const rows = json.map((row) => {
+            const obj = {};
+            headers.forEach((h, i) => {
+              obj[h] = row[i] !== undefined ? String(row[i]) : "";
+            });
+            return obj;
+          });
+          return { headers, rows };
+        },
+
+        rebuildWorkbookHeaders: function () {
+          const ed = editor.state.excelData;
+          if (!ed?.workbook) return;
+
+          ed.allHeaders = {};
+          ed.sheetNames = [];
+          ed.sheetCache = {};
+
+          ed.workbook.SheetNames.forEach((name) => {
+            const ws = ed.workbook.Sheets[name];
+            if (!ws || !ws["!ref"]) return;
+            const { headers, rows } = this.parseSheetData(ws);
+            if (!headers.length && !rows.length) return;
+            ed.sheetNames.push(name);
+            ed.allHeaders[name] = headers;
+          });
+        },
+
+        onHeaderModeChange: function (checked) {
+          const ed = editor.state.excelData;
+          if (!ed) return;
+          ed.firstRowAsHeader = checked !== false;
+
+          if (!ed.workbook) return;
+
+          this.rebuildWorkbookHeaders();
+          if (!ed.sheetNames.length) {
+            editor.state.headers = [];
+            editor.state.dataRows = [];
+            this.renderFieldChips([]);
+            editor.builder.refreshAllText();
+            return;
+          }
+
+          if (!ed.sheetNames.includes(ed.currentSheet)) {
+            ed.currentSheet = ed.sheetNames[0];
+          }
+
+          this.renderSheetTabs();
+          this.loadSheet(ed.currentSheet);
+        },
+
         pickFileAndLoad: async function () {
           if ("showOpenFilePicker" in window) {
             try {
@@ -7220,20 +7312,9 @@
                 const ed = editor.state.excelData;
 
                 ed.workbook = wb;
-                ed.sheetNames = [];
-                ed.allHeaders = {};
-                ed.sheetCache = {};
                 ed.excelHandleId = handleId;
-
-                wb.SheetNames.forEach((name) => {
-                  const ws = wb.Sheets[name];
-                  if (!ws || !ws["!ref"]) return;
-                  const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
-                  if (json.length > 0 && json[0].length > 0) {
-                    ed.sheetNames.push(name);
-                    ed.allHeaders[name] = json[0].map(String);
-                  }
-                });
+                if (typeof ed.firstRowAsHeader === "undefined") ed.firstRowAsHeader = true;
+                this.rebuildWorkbookHeaders();
 
                 if (!ed.sheetNames.length) throw new Error("没有找到有效的数据表");
                 ed.currentSheet = ed.sheetNames[0];
@@ -7262,19 +7343,7 @@
           if (!ed.sheetCache[sheetName]) {
             const ws = ed.workbook.Sheets[sheetName];
             if (ws) {
-              const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
-              if (json.length > 0) {
-                const headers = json[0].map(String);
-                ed.sheetCache[sheetName] = json.slice(1).map((row) => {
-                  const obj = {};
-                  headers.forEach((h, i) => {
-                    obj[h] = row[i] !== undefined ? String(row[i]) : "";
-                  });
-                  return obj;
-                });
-              } else {
-                ed.sheetCache[sheetName] = [];
-              }
+              ed.sheetCache[sheetName] = this.parseSheetData(ws).rows;
             } else {
               ed.sheetCache[sheetName] = [];
             }
@@ -7322,24 +7391,17 @@
           const ws = ed.workbook.Sheets[sheetName];
           if (!ws) return;
 
-          const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
-          if (!json.length) {
+          const { headers, rows } = this.parseSheetData(ws);
+          if (!headers.length && !rows.length) {
             editor.state.headers = [];
             editor.state.dataRows = [];
             return;
           }
 
-          const headers = json[0].map(String);
-          const rows = json.slice(1).map((row) => {
-            const obj = {};
-            headers.forEach((h, i) => {
-              obj[h] = row[i] !== undefined ? String(row[i]) : "";
-            });
-            return obj;
-          });
-
           editor.state.headers = headers;
           editor.state.dataRows = rows;
+          ed.allHeaders[sheetName] = headers;
+          ed.sheetCache[sheetName] = rows;
 
           const countEl = document.getElementById("data-row-count");
           if (countEl) countEl.innerText = `${rows.length} 条数据`;
