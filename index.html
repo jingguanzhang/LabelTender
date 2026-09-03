@@ -1901,14 +1901,14 @@
               <div class="grid grid-cols-2 gap-3">
                 <div class="flex flex-col gap-1.5">
                   <label class="text-xs text-gray-500 font-medium">条高</label>
-                  <input type="number" id="bc-height" value="60" min="0.05" max="300"
-                    oninput="editor.barcodeProps.update('barHeight', parseInt(this.value))"
+                  <input type="number" id="bc-height" value="60" min="1" max="300" step="1"
+                    oninput="if (Number.isFinite(this.valueAsNumber)) editor.barcodeProps.update('barHeight', Math.max(1, Math.round(this.valueAsNumber)))"
                     class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-gray-50 outline-none focus:border-blue-500 focus:bg-white transition-all text-gray-500 text-center" />
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <label class="text-xs text-gray-500 font-medium">条宽比</label>
                   <input type="number" id="bc-width" value="2" min="1" max="5" step="0.5"
-                    oninput="editor.barcodeProps.update('barWidth', parseFloat(this.value))"
+                    oninput="const raw = this.value.trim(); if (!raw || raw.endsWith('.')) return; if (Number.isFinite(this.valueAsNumber)) editor.barcodeProps.update('barWidth', Math.min(5, Math.max(1, this.valueAsNumber)))"
                     class="w-full border border-gray-200 rounded-md px-2 py-1.5 text-xs bg-gray-50 outline-none focus:border-blue-500 focus:bg-white transition-all text-gray-500 text-center" />
                 </div>
               </div>
@@ -7063,10 +7063,11 @@
           const sv = (id, val) => {
             const el = document.getElementById(id);
             if (el) {
+              if (document.activeElement === el) return;
               if (el.type === "color") {
                 el.value = val === "transparent" || !val ? "#ffffff" : val;
               } else {
-                el.value = typeof val === "number" ? Math.round(val) : val;
+                el.value = typeof val === "number" ? String(val) : val;
               }
             }
           };
